@@ -1,0 +1,66 @@
+---
+title: "PRS score"
+author: "Alex Flynn-Carroll"
+date: "2/9/2022"
+output: html_document
+---
+
+```{r }
+library(optparse)
+library(bigsnpr)
+library(tibble)
+library(readr)
+library(dplyr)
+```
+/u/project/pasaniuc/pasaniucdata/pajukanta_mexican_data/mexican2020-9051_imputed/topmed.r2.phased.rsq0.3s
+
+
+```{r }
+parser <- OptionParser()
+
+parser <- add_option(parser, '--train_bfile', action = 'store', type = 'character')
+parser <- add_option(parser, '--train_sumstats', action = 'store', type = 'character')
+
+```
+
+```{r}
+parser <- add_option(parser, '--train_bfile', action = 'store', type = 'character')
+parser <- add_option(parser, '--train_sumstats', action = 'store', type = 'character')
+
+parser <- add_option(parser, '--val_bfile', action = 'store', type = 'character')
+parser <- add_option(parser, '--val_pheno', action = 'store', type = 'character')
+
+parser <- add_option(parser, '--test_bfile', action = 'store', type = 'character')
+
+parser <- add_option(parser, '--out_dir', action = 'store', type = 'character')
+parser <- add_option(parser, '--cache_dir', action = 'store', type = 'character')
+parser <- add_option(parser, '--chr_i', action = 'store', type = 'integer')
+parser <- add_option(parser, '--n_cores', action = 'store', type = 'integer')
+parser <- add_option(parser, '--output_train_val_num', action = 'store', type = 'integer', default=0, help="How many individuals information should the program output")
+parser <- add_option(parser, '--num_burn_in', action = 'store', type = 'integer', default=100)
+parser <- add_option(parser, '--num_iter', action = 'store', type = 'integer', default=500)
+
+```
+
+```{r}
+parser <- parse_args(parser)
+```
+
+```{r}
+train_snps = read_tsv(paste0(parser$train_bfile, '.bim'), 
+        col_names=c('CHR', 'SNP', 'CM', 'BP', 'A1', 'A2'),
+        col_types='icdicc')
+
+train_rds_path = snp_readBed2(paste0(parser$train_bfile, '.bed'),
+    backingfile = tempfile(),
+    ind.col = which(train_snps$CHR == parser$chr_i))
+
+train_bigSNP <- snp_attach(train_rds_path)
+
+# extract data for analyses
+train_G  <- snp_fastImputeSimple(train_bigSNP$genotypes, 
+        method = 'mean2', ncores = parser$n_cores)
+CHR <- train_bigSNP$map$chromosome
+POS <- train_bigSNP$map$physical.pos
+
+```

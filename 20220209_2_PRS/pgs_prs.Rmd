@@ -1,0 +1,16 @@
+---
+stitle: "PGS cat PRS"
+author: "Alex Flynn-Carroll"
+date: "2/22/2022"
+output: html_document
+---
+
+```{r}
+
+library(vcfR)
+```
+
+```{r}
+vcf <- read.vcfR("/u/home/a/afcarrol/vcf_trimmed/hg19_vcfs/chr1_hg19.vcf" , verbose = FALSE )
+
+```

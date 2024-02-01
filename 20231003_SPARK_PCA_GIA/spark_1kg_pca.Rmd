@@ -1,0 +1,284 @@
+---
+title: "pca_1kg_spark"
+author: "Alex Flynn-Carroll"
+date: "2023-10-01"
+output: html_document
+---
+
+```{r packages}
+
+library(bigsnpr)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(optparse)
+library(gridExtra)
+```
+files in /u/project/pasaniuc/yiding/projects/onekg
+
+(onekg_bed <- bed(parser$onekg_bfile))
+(atlas_bed <- bed(parser$atlas_bfile))
+
+# pca 
+obj.svd  <- bed_projectPCA(
+    obj.bed.ref = onekg_bed,
+    obj.bed.new = atlas_bed,
+    k = parser$K,
+    strand_flip = TRUE,
+    join_by_pos = TRUE,
+    match.min.prop = 0.5,
+    build.new = "hg38",
+    build.ref = "hg38",
+    verbose = TRUE,
+    ncores = parser$ncores
+)
+
+done on hoffman2
+```{r}
+
+obj.svd <- readRDS("spark_pca-model.rds")
+
+```
+
+```{r}
+
+source('/Users/afc/code/r_projects/20231001_pca/from_yi/plot-grid2.r')
+
+```
+
+
+```{r}
+
+parser <- OptionParser()
+parser <- add_option(parser,
+  "--plink",
+  action = "store", type = "character", default = '/Users/afc/miniconda3/bin/plink'
+)
+parser <- add_option(parser,
+  "--plink2",
+  action = "store", type = "character", default = '/Users/afc/miniconda3/bin/plink2'
+)
+parser <- add_option(parser,
+  "--onekg_bed",
+  action = "store", type = "character", default =  '/Users/afc/code/r_projects/20231001_pca/from_yi/onekg.chrall.phase2.qced.bed'
+)
+#bfile changed to bed
+
+parser <- add_option(parser,
+  "--spark_bed",
+  action = "store", type = "character", default = ''#####
+)
+parser <- add_option(parser,
+  "--out_dir",
+  action = "store", type = "character", default = NULL
+)
+
+parser <- add_option(parser,
+  "--onekg_info_file",
+  action = "store", type = "character", default = '/Users/afc/code/r_projects/20231001_pca/from_yi/20130606_g1k_3202_samples_ped_population.txt'
+)
+
+parser <- add_option(parser,
+  "--K",
+  action = "store", type = "integer", default = 20
+)
+parser <- add_option(parser,
+  "--ncores",
+  action = "store", type = "integer", default = 10
+)
+parser <- parse_args(parser)
+
+(onekg_bed <- bed(parser$onekg_bed))
+(spark_bed <- bed(parser$spark_bed))
+
+```
+
+```{r}
+
+# get pcs
+spark_pcs<- obj.svd$OADP_proj
+colnames(spark_pcs) <- paste0('PC', 1:parser$K)
+spark_pcs_df <- as.data.frame(spark_pcs)
+spark_pcs_df$FID <- as.character(spark_bed$fam$family.ID)
+spark_pcs_df$IID <- as.character(spark_bed$fam$sample.ID)
+spark_pcs_df$data <- 'spark'
+
+onekg_pcs <- predict(obj.svd$obj.svd.ref)
+colnames(onekg_pcs) <- paste0('PC', 1:parser$K)
+onekg_pcs_df <- as.data.frame(onekg_pcs)
+onekg_pcs_df$FID <- as.character(onekg_bed$fam$family.ID)
+onekg_pcs_df$IID <- as.character(onekg_bed$fam$sample.ID)
+onekg_pcs_df$data <- '1000Genome'
+
+```
+################## Skip/ run on its own
+```{r}
+
+#spark_pcs_df <- merge(x = spark_pcs_df , y = asbf, by = "IID", all.x = TRUE)
+# this added extra rows - samples listed in multiple sets I believe
+```
+
+```{r}
+
+# spark pcs plot 
+#color <- alpha(c("EUR" = "#B5E48C",  "AMR" = "#F79661", "SAS" = "#815ac0", "EAS" = "#6183C2","AFR" = "#C46363", "Unclassified" = "#6d6875"), 0.5)
+plot_spark_batch <-plot_grid2(plotlist = lapply(1:min(5, parser$K), function(k) {
+    k1 <- k
+    k2 <- k+1
+    qplot(spark_pcs_df[,paste0('PC', k1)], spark_pcs_df[,paste0('PC', k2)], color = spark_pcs_df$batch, size = I(2)) +
+        theme_bigstatsr(0.6) + 
+        labs(x = paste0("PC", k1), y = paste0("PC", k2), color = "Imputation Batch") +
+        coord_equal()
+}), nrow = 2, legend_ratio = 0.2, title_ratio = 0)
+ggsave( 'plot-spark-pcplot_batch.pdf', plot_spark_batch, width = 20, height = 5)
+
+```
+##################
+
+```{r}
+
+# compute pairwise fst and dist 
+onekg_info <- read_delim(parser$onekg_info_file, delim = ' ', col_types = cols())
+pop <- onekg_bed$fam %>% left_join(onekg_info, by = c('sample.ID' = 'SampleID')) %>% pull(Superpopulation)
+onekg_pcs_df$ancestry= pop
+ind_pop <- split(seq_along(pop), pop)
+
+```
+
+```{r}
+
+## get center 
+list_pop_center <- lapply(ind_pop, function(ind) colMeans(onekg_pcs[ind,]))
+dist <- c()
+for (i in seq(4)){
+    for (j in seq(i+1, 5, 1)){
+        dist <- c(dist, sum((list_pop_center[[i]] - list_pop_center[[j]])**2))
+    }
+}
+
+```
+
+```{r}
+
+## get allele frequency
+list_pop_af <- lapply(ind_pop, function(ind) bed_MAF(onekg_bed, ind, ind.col = attr(obj.svd$ obj.svd.ref, 'subset')))
+fst <- c()
+pair <- c()
+for (i in seq(4)){
+    for (j in seq(i+1, 5, 1)){
+        fst <- c(fst, snp_fst(list_pop_af[c(i, j)], overall = TRUE))
+        pair <- c(pair, paste0(names(list_pop_af)[i], '_', names(list_pop_af)[j]))
+    }
+}
+print(paste0('minimal fst: ', pair[which.min(fst)], ' ', min(fst)))
+print(paste0('maximal fst: ', pair[which.max(fst)], ' ', max(fst)))
+print(paste0('sq distance threshold: ', max(dist) * min(fst) / max(fst)/2))
+## save fst and dist plot 
+plot_fst_dist <- qplot(dist, fst, label = pair) + 
+    theme_bigstatsr(size = 1)   + annotate("text",x = dist, y = fst, label = pair)
+ggsave('plot-fst-dist.pdf', plot_fst_dist, width = 6, height = 4)        
+
+
+
+```
+
+
+```{r}
+
+                                                    
+# call GIA in spark
+spark_sq_dist <- as.data.frame(lapply(list_pop_center,  function(one_center) rowSums(sweep(spark_pcs, 2, one_center, '-')^2)))
+group <- colnames(spark_sq_dist)
+
+ancestry <- apply(spark_sq_dist, 1, function(sq_dist) {
+    ind <- which.min(sq_dist)
+    if ((group[ind] == 'AMR' | group[ind] == 'AFR')) {
+        group[ind] # if anyone is closest to AMR or AFR, it's classified into AMR/AFR, there's no distance threshold
+    }else if(sq_dist[ind] < max(dist) * min(fst)/max(fst) * 0.5 ) {
+        group[ind] # for EUR, SAS and EAS, we apply a more stringent distance threshold
+    }else{
+        NA
+    }
+})
+ancestry[is.na(ancestry)] <- 'Unclassified'
+spark_pcs_df$ancestry <- ancestry
+table(ancestry)
+
+
+                                      
+# save results
+pcs_df <- bind_rows(spark_pcs_df, onekg_pcs_df) %>% relocate(starts_with('PC'), .after = last_col())
+pcs_df %>% write_tsv('spark-onekg-pcs-ancestry.tsv')
+
+for(anc in c('EUR', 'AMR', 'SAS', 'EAS', 'AFR')){
+    pcs_df %>% filter(data == 'spark', ancestry == anc) %>% select(FID, IID) %>% 
+        write_tsv(paste0( 'spark.', anc, '.list'))
+}
+
+```
+
+```{r}
+
+plot_onekg_spark <-plot_grid2(plotlist = lapply(1:min(10, parser$K), function(k) {
+    k1 <- k
+    k2 <- k+1
+    qplot(pcs_df[,paste0('PC', k1)], pcs_df[,paste0('PC', k2)], color = pcs_df$data, size = I(2)) +
+        theme_bigstatsr(0.6) +
+        labs(x = paste0("PC", k1), y = paste0("PC", k2), color = "dataset") +
+        coord_equal()
+}), nrow = 2, legend_ratio = 0.2, title_ratio = 0)
+
+```
+
+```{r}
+
+# draw some pretty figures 
+## check onekgspark alignment
+plot_onekg_spark <-plot_grid2(plotlist = lapply(1:min(10, parser$K), function(k) {
+    k1 <- k
+    k2 <- k+1
+    qplot(pcs_df[,paste0('PC', k1)], pcs_df[,paste0('PC', k2)], color = pcs_df$data, size = I(2)) +
+        theme_bigstatsr(0.6) +
+        labs(x = paste0("PC", k1), y = paste0("PC", k2), color = "dataset") +
+        coord_equal()
+}), nrow = 2, legend_ratio = 0.2, title_ratio = 0)
+ggsave( 'plot-check-onekg-spark-alignment.pdf', plot_onekg_spark, width = 20, height = 5)
+
+# color onekg ancestry
+pcs_df <- pcs_df %>% mutate(onekg_ancestry = replspark(ancestry, data == 'spark', 'spark'))
+color <- alpha(c("EUR" = "#B5E48C",  "AMR" = "#F79661", "SAS" = "#815ac0", "EAS" = "#6183C2","AFR" = "#C46363", "spark" = "#6d6875"), 0.5)
+plot_onekg_ancestry <-plot_grid2(plotlist = lapply(1:min(5, parser$K), function(k) {
+    k1 <- k
+    k2 <- k+1
+    qplot(pcs_df[,paste0('PC', k1)], pcs_df[,paste0('PC', k2)], color = pcs_df$onekg_ancestry, size = I(2)) +
+        theme_bigstatsr(0.6) + scale_colour_manual(values = color) + 
+        labs(x = paste0("PC", k1), y = paste0("PC", k2), color = "GIA") +
+        coord_equal()
+}), nrow = 1, legend_ratio = 0.2, title_ratio = 0)
+ggsave('plot-check-onekg-ancestry-over-spark.pdf', plot_onekg_ancestry, width = 20, height = 5)
+
+
+```
+
+
+```{r}
+
+# spark pcs plot 
+color <- alpha(c("EUR" = "#B5E48C",  "AMR" = "#F79661", "SAS" = "#815ac0", "EAS" = "#6183C2","AFR" = "#C46363", "Unclassified" = "#6d6875"), 0.5)
+plot_spark_ancestry <-plot_grid2(plotlist = lapply(1:min(5, parser$K), function(k) {
+    k1 <- k
+    k2 <- k+1
+    qplot(spark_pcs_df[,paste0('PC', k1)], spark_pcs_df[,paste0('PC', k2)], color = spark_pcs_df$ancestry, size = I(2)) +
+        theme_bigstatsr(0.6) + scale_colour_manual(values = color) + 
+        labs(x = paste0("PC", k1), y = paste0("PC", k2), color = "GIA") +
+        coord_equal()
+}), nrow = 1, legend_ratio = 0.2, title_ratio = 0)
+ggsave('plot-spark-pcplot.pdf', plot_spark_ancestry, width = 20, height = 5)
+
+```
+
+```{r}
+
+anc_table <- table(spark_pcs_df$ancestry)
+
+```

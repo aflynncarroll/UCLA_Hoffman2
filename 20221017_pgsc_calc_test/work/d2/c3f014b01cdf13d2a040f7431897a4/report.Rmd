@@ -1,0 +1,1 @@
+/u/home/a/afcarrol/.nextflow/assets/pgscatalog/pgsc_calc/bin/report.Rmd

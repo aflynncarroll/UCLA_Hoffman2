@@ -1,0 +1,56 @@
+---
+title: "Pick SNPs"
+author: "Alex Flynn-Carroll"
+date: "2/19/2022"
+output: html_document
+---
+
+
+```{r}
+library(optparse)
+library(bigsnpr)
+library(tibble)
+library(readr)
+library(dplyr)
+```
+
+```{r format filtering list}
+
+snp_list <- read.csv("run_snps.csv")
+
+snp_list$V4 <- sub("\\/.*", "", snp_list$allele)
+
+snp_list$V1 <- paste0("chr", snp_list$chr_name)
+
+colnames(snp_list)[4] <- "V2"
+
+snp_list$match <- paste(snp_list$V1, snp_list$V2, snp_list$V4, sep="_")
+```
+
+```{r test with chrom 1}
+
+chr1 <- read.table("../snp_lists/chr1.snp_list.txt", header = F)
+
+chr1$match <- paste(chr1$V1, chr1$V2, chr1$V4, sep="_")
+
+test <- chr1[chr1$match %in%snp_list$match,1:8]
+
+write.table(test, file = "updated_lists/chr1.snp_list.txt",
+            row.names = F, col.names = F, quote = F)
+```
+
+```{r}
+for (i in 2:22) {
+ print(i) 
+chrom <- read.table(paste0("../snp_lists/chr", i, ".snp_list.txt"), header = F)
+  
+chrom$match <- paste(chrom$V1, chrom$V2, chrom$V4, sep="_")  
+
+chrom <- chrom[chrom$match %in%snp_list$match,1:8]
+
+write.table(chrom, file = paste0("updated_lists/chr", i, ".snp_list.txt"),
+            row.names = F, col.names = F, quote = F)
+print(dim(chrom))
+}
+
+```
