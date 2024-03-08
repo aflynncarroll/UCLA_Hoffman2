@@ -9,6 +9,7 @@
 
 . /u/local/Modules/default/init/modules.sh
 module load anaconda3/2020.11
+
 conda activate plink2_env
 #module load plink2
 

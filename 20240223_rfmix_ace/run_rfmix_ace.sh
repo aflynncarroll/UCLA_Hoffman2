@@ -12,19 +12,15 @@ module load anaconda3/2020.11
 conda activate plink2_env
 module load bcftools
 module load htslib
-#chrom=1
+
 chrom=${SGE_TASK_ID}
+
 REF_DIR=/u/project/pasaniuc/pasaniucdata/DATA/1000_Genomes_30x_GRCh38_phased
 RFMIX=/u/project/pasaniuc/kangchen/software/rfmix/rfmix
-#pfile=/u/project/geschwind/shared/GenomicDatasets-processed/ACE-ANALYSIS/freeze0/SPARK/imputed/chr${chrom}
-bfile=/u/home/a/afcarrol/project-pasaniuc/Projects/20230117_spark_pca_update/SPARK_bed_by_chrom/SPARK_genos_chr${chrom}
-#out_prefix=/u/home/a/afcarrol/project-pasaniuc/Projects/20240208_rfmix_spark/out/chr${chrom}
-out_prefix=/u/project/geschwind/shared/PRS/20240221_SPARK_RFMix/chr${chrom}
+bfile=/u/project/geschwind/shared/GenomicDatasets-processed/Imputed/total_vcfs_r2_0.8/filtered_1kg/chrom_pfiles/merged_1kg_chr${chrom}
+out_prefix=/u/project/geschwind/shared/PRS/20240223_ACE_RFMix/chr${chrom}
 
 
-#mkdir -p /u/home/a/afcarrol/project-pasaniuc/Projects/16022022_ancestry/rfmix-lanc
-
-#plink2 --pfile ${pfile} \
 plink2 --bfile ${bfile} \
     --chr ${chrom} \
     --output-chr 26 \
