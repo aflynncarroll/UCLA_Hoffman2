@@ -1,10 +1,10 @@
 #!/bin/bash -l
 #$ -N rfmix_spark
 #$ -cwd
-#$ -l h_data=200G,h_rt=3:00:00,highp
+#$ -l h_data=120G,h_rt=16:00:00,highp
 #$ -j y
 #$ -o ./job_out
-#$ -t t
+#$ -t 1-22
 
 #Run local ancestry with RFmix using plink2 pfile
 . /u/local/Modules/default/init/modules.sh
@@ -12,15 +12,12 @@ module load anaconda3/2020.11
 conda activate plink2_env
 module load bcftools
 module load htslib
-
-for chrom in {2..22}
-do
 #chrom=1
-#chrom=${SGE_TASK_ID}
+chrom=${SGE_TASK_ID}
 REF_DIR=/u/project/pasaniuc/pasaniucdata/DATA/1000_Genomes_30x_GRCh38_phased
 RFMIX=/u/project/pasaniuc/kangchen/software/rfmix/rfmix
-pfile=/u/project/geschwind/shared/GenomicDatasets-processed/ACE-ANALYSIS/freeze0/SPARK/hm3/chr${chrom}
-out_prefix=/u/home/a/afcarrol/project-pasaniuc/Projects/20240422_SPARK_rfmix_test/rfmix_out/chr${chrom}
+pfile=/u/project/geschwind/shared/GenomicDatasets-processed/Imputed/total_vcfs_r2_0.8/combined/hm3_filtered_pfiles/ace_hm3_chr${chrom}
+out_prefix=/u/home/a/afcarrol/project-pasaniuc/Projects/20240423_ace_partial_hm3/rfmix_out/chr${chrom}
 
 
 #mkdir -p /u/home/a/afcarrol/project-pasaniuc/Projects/16022022_ancestry/rfmix-lanc
@@ -47,5 +44,3 @@ ${RFMIX} \
     -o ${out_prefix}
 
 rm ${out_prefix}*tmp*
-
-done
