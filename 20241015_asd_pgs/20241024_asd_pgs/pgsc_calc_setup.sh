@@ -60,7 +60,7 @@ cd project-pasaniuc/projects/20241015_asd_pgs/20241024_asd_pgs/
 
 /u/home/a/aflynnca/nextflow run pgscatalog/pgsc_calc -r v1.2.0 \
     -profile singularity \
-    --input /u/project/pasaniuc/afcarrol/Projects/20221020_pgsc_calc_autism/SPARK_full.csv \
+    --input /u/project/pasaniuc/aflynnca/projects/20221020_pgsc_calc_autism/SPARK_full.csv \
     --target_build GRCh38 \
     --scorefile /u/home/a/aflynnca/project-pasaniuc/projects/20241015_asd_pgs/20241024_asd_pgs/asd_hg38_grove.txt \
     --min_overlap 0.001
