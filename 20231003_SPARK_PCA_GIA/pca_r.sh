@@ -27,9 +27,9 @@ parser <- add_option(parser,
   action = "store", type = "character", default =  '/u/home/a/afcarrol/project-pasaniuc/Projects/20230928_pca/from_yi/onekg.chrall.phase2.qced.bed'
 )
 #bfile changed to bed
-
+# spark_bed changed from ace_bed
 parser <- add_option(parser,
-  "--ace_bed",
+  "--spark_bed",
   action = "store", type = "character", default = '/u/project/geschwind/shared/GenomicDatasets-processed/Imputed/SPARK/merged/total_1kg_spark.bed'
 )
 parser <- add_option(parser,
@@ -49,12 +49,12 @@ parser <- parse_args(parser)
 
 # load bed file 
 (onekg_bed <- bed(parser$onekg_bed))
-(ace_bed <- bed(parser$ace_bed))
+(spark_bed <- bed(parser$spark_bed))
 
 # pca 
 obj.svd  <- bed_projectPCA(
     obj.bed.ref = onekg_bed,
-    obj.bed.new = ace_bed,
+    obj.bed.new = spark_bed,
     k = parser$K,
     strand_flip = TRUE,
     join_by_pos = TRUE,
